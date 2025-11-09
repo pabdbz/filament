@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mandala Hashé — complet</title>
+<style>
+  html,body{
+    height:100%;
+    margin:0;
+  }
+
+  body {
+    overflow: hidden;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: monospace;
+    height: 100vh;
+    position: relative;
+    background: #000; /* fallback */
+  }
+
+  /* FOND avec ta couleur pref rahlala*/
+  body::before{
+    content: "";
+    position: fixed;
+    inset: -10%;
+    background: linear-gradient(160deg, #2a006a 0%, #4b0096 40%, #6f00c4 70%, #320061 100%);
+    background-size: 250% 250%;
+    animation: gradientMove 14s ease-in-out infinite;
+    filter: brightness(1.03) contrast(1.04);
+    z-index: -2;
+  }
+  @keyframes gradientMove {
+    0%   { background-position: 0% 40%; }
+    50%  { background-position: 100% 60%; }
+    100% { background-position: 0% 40%; }
+  }
+
+  /* Grain */
+  body::after{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:-1;
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 4px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,0.02) 0 1px, transparent 1px 4px);
+    opacity:0.12;
+    mix-blend-mode:overlay;
+    animation: noiseShift 0.8s steps(4) infinite;
+  }
+  @keyframes noiseShift {
+    0%,100%{transform:translate(0,0);}
+    50%{transform:translate(-1%,1%);}
+  }
+
+  #controls {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 2;
+  }
+
+  input {
+    background: rgba(0,0,0,0.38);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 1rem;
+    width: 220px;
+    text-align: center;
+    backdrop-filter: blur(4px);
+  }
+
+  button {
+    margin-left: 8px;
+    background: rgba(0,0,0,0.45);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  canvas {
+    display:block;
+    width:100vw;
+    height:100vh;
+  }
+
+  /* txt */
+  #footerText {
+    position: fixed;
+    bottom: 10%;
+    right: 10%;
+    font-size: 0.72rem;
+    opacity: 0.8;
+    width: 340px;
+    max-width: 38vw;
+    text-align: right;
+    line-height: 1.25;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  @media (max-width:600px){
+    #footerText{
+      right:6%;
+      bottom:8%;
+      font-size:0.6rem;
+      width: 46vw;
+    }
+    input { width: 140px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <input id="wordInput" placeholder="write here :)" />
+  <button id="generate">process</button>
+</div>
+
+<canvas id="mandala"></canvas>
+
+<div id="footerText">
+The world depends profoundly upon us; we shape it in the image of our own thoughts and those thoughts, in turn, are born from language itself. Life can be unbearably difficult at times. You reminded me, wisely, that we have control over nothing, and yet we choose what is allowed to touch us.
+
+Thank you for your gestures of tenderness they moved me deeply and brought a quiet peace into my world, the kind it had long been missing.
+
+Gesture > Word > Form > Gesture > and so it goes.
+
+I wish I had known you more, for your gestures carried a rare harmony; and that harmony the passage from mere data to beauty I have translated here, for you alone.
+A dedication to Jean de Chelles.
+</div>
+
+<script>
+/* canva de merde */
+const canvas = document.getElementById("mandala");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+/* reprise de l'ancien script */
+function hashWord(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+  }
+  return Math.abs(h);
+}
+
+function paramsFromWord(word) {
+  const hash = hashWord(word || "mandala");
+  const letters = Math.max(1, (word || "mandala").length);
+
+  const k = (hash % 15 + 2) / (letters % 3 + 1); // fréquence pour la rosace
+  const amplitude = Math.max(200, 20 * letters + (hash % 100)); // taille visible
+  const sym = Math.max(4, (hash % 12) + 3); // copies radiales
+  const speed = ((hash % 50) / 20000) + 0.001; // vitesse rotation lente
+
+  return { k, amplitude, sym, speed };
+}
+
+/*algo enrichi */
+function drawMandala(k, a, sym) {
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.95)";
+  ctx.lineWidth = 1;
+
+  // Anneaux concentriques
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.arc(0, 0, (a / 4) * (i + 1), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Rosace de baseforme sinusoïdale)
+  ctx.beginPath();
+  const steps = 2000;
+  for (let i = 0; i <= steps; i++) {
+    const θ = (i / steps) * 2 * Math.PI;
+    const r = a * Math.cos(k * θ);
+    const x = r * Math.cos(θ);
+    const y = r * Math.sin(θ);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Répétitions radiales copies de la rosace)
+  for (let s = 0; s < sym; s++) {
+    ctx.rotate((2 * Math.PI) / sym);
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const θ = (i / steps) * 2 * Math.PI;
+      const r = a * Math.cos(k * θ);
+      const x = r * Math.cos(θ);
+      const y = r * Math.sin(θ);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Figures géométriques simples c malin
+  function drawPolygon(sides, radius) {
+    ctx.beginPath();
+    for (let i = 0; i <= sides; i++) {
+      const angle = (i / sides) * 2 * Math.PI;
+      const x = radius * Math.cos(angle);
+      const y = radius * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+  drawPolygon(4, a * 0.7);
+  drawPolygon(3, a * 0.4);
+
+  // Effet fractal 
+  function recursiveCircles(r, depth) {
+    if (depth === 0) return;
+    for (let i = 0; i < sym; i++) {
+      const angle = (i / sym) * 2 * Math.PI;
+      const x = r * Math.cos(angle);
+      const y = r * Math.sin(angle);
+      ctx.beginPath();
+      ctx.arc(x, y, r / 3, 0, Math.PI * 2);
+      ctx.stroke();
+      recursiveCircles(r / 2, depth - 1);
+    }
+  }
+  recursiveCircles(a / 2, 2);
+
+  /* des ptis points */
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  const dotCount = Math.max(8, Math.floor(sym * 2.5));
+  for (let i = 0; i < dotCount; i++) {
+    const ang = (i / dotCount) * Math.PI * 2;
+    const rr = a * 0.85;
+    const dx = rr * Math.cos(ang);
+    const dy = rr * Math.sin(ang);
+    ctx.beginPath();
+    ctx.arc(dx, dy, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/* top animation*/
+let rotation = 0;
+let currentParams = { k: 7, amplitude: 300, sym: 6, speed: 0.001 };
+
+function animate() {
+  const { k, amplitude, sym, speed } = currentParams;
+  const w = canvas.width, h = canvas.height;
+
+  // Clear once per frame
+  ctx.clearRect(0, 0, w, h);
+// Histoire que je m'en souvienne 
+  // Apply a gentle radial vignette (subtle) using composite to not kill perf
+  // (optional — commented out; tu peux décommenter si tu veux)
+  // ctx.save();
+  // ctx.fillStyle = 'rgba(0,0,0,0.06)';
+  // ctx.fillRect(0,0,w,h);
+  // ctx.restore();
+
+  // Global rotation of the whole mandala
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(rotation);
+  ctx.translate(-w / 2, -h / 2);
+
+  // Draw mandala centered
+  drawMandala(k, amplitude, sym);
+
+  ctx.restore();
+
+  rotation += speed;
+  requestAnimationFrame(animate);
+}
+
+/* Faut quand mm que ca serve a qlq chose */
+document.getElementById("generate").addEventListener("click", () => {
+  const word = document.getElementById("wordInput").value.trim() || "mandala";
+  currentParams = paramsFromWord(word);
+});
+
+/* optionnel*/
+document.getElementById("wordInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    document.getElementById("generate").click();
+  }
+});
+
+/* random presenté */
+currentParams = paramsFromWord("mandala");
+animate();
+</script>
+</body>
+</html>
